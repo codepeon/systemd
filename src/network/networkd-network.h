@@ -83,6 +83,8 @@ struct Network {
         /* Master or stacked netdevs */
         bool keep_master;
         NetDev *batadv;
+        char *namespace;
+
         NetDev *bridge;
         NetDev *bond;
         NetDev *vrf;
@@ -389,6 +391,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_ipv6_link_local_address_gen_mode);
 CONFIG_PARSER_PROTOTYPE(config_parse_activation_policy);
 CONFIG_PARSER_PROTOTYPE(config_parse_link_group);
 CONFIG_PARSER_PROTOTYPE(config_parse_ignore_carrier_loss);
+CONFIG_PARSER_PROTOTYPE(config_parse_namespace);
 
 const struct ConfigPerfItem* network_network_gperf_lookup(const char *key, GPERF_LEN_TYPE length);
 

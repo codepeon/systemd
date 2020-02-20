@@ -69,6 +69,10 @@ static inline bool rtnl_message_type_is_mdb(uint16_t type) {
         return IN_SET(type, RTM_NEWMDB, RTM_DELMDB, RTM_GETMDB);
 }
 
+static inline bool rtnl_message_type_is_netns(uint16_t type) {
+        return IN_SET(type, RTM_NEWNSID, RTM_DELNSID, RTM_GETNSID);
+}
+
 int rtnl_set_link_name(sd_netlink **rtnl, int ifindex, const char *name);
 int rtnl_set_link_properties(
                 sd_netlink **rtnl,

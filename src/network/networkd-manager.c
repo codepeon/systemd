@@ -124,17 +124,19 @@ static int manager_connect_bus(Manager *m) {
         if (r < 0)
                 return log_error_errno(r, "Failed to connect to bus: %m");
 
-        r = bus_add_implementation(m->bus, &manager_object, m);
-        if (r < 0)
-                return r;
+        if (!m->namespace) {
+                r = bus_add_implementation(m->bus, &manager_object, m);
+                if (r < 0)
+                        return r;
 
-        r = bus_log_control_api_register(m->bus);
-        if (r < 0)
-                return r;
+                r = bus_log_control_api_register(m->bus);
+                if (r < 0)
+                        return r;
 
-        r = sd_bus_request_name_async(m->bus, NULL, "org.freedesktop.network1", 0, NULL, NULL);
-        if (r < 0)
-                return log_error_errno(r, "Failed to request name: %m");
+                r = sd_bus_request_name_async(m->bus, NULL, "org.freedesktop.network1", 0, NULL, NULL);
+                if (r < 0)
+                        return log_error_errno(r, "Failed to request name: %m");
+        }
 
         r = sd_bus_attach_event(m->bus, m->event, 0);
         if (r < 0)
@@ -454,14 +456,15 @@ int manager_setup(Manager *m) {
         if (r < 0)
                 return r;
 
-        m->state_file = strdup("/run/systemd/netif/state");
+        m->state_file = path_join(m->runtime_directory, "state");
         if (!m->state_file)
                 return -ENOMEM;
 
         return 0;
 }
 
-int manager_new(Manager **ret, bool test_mode) {
+int manager_new(Manager **ret, const char *namespace, bool test_mode) {
+        const char *e;
         _cleanup_(manager_freep) Manager *m = NULL;
 
         m = new(Manager, 1);
@@ -480,6 +483,22 @@ int manager_new(Manager **ret, bool test_mode) {
                 .duid_product_uuid.type = DUID_TYPE_UUID,
         };
 
+        if (namespace) {
+                m->namespace = strdup(namespace);
+                if (!m->namespace)
+                        return -ENOMEM;
+        }
+
+        e = getenv("RUNTIME_DIRECTORY");
+        if (e)
+                m->runtime_directory = strdup(e);
+        else if (m->namespace)
+                m->runtime_directory = strjoin("/run/systemd/netif.", namespace);
+        else
+                m->runtime_directory = strdup("/run/systemd/netif");
+        if (!m->runtime_directory)
+                return -ENOMEM;
+
         *ret = TAKE_PTR(m);
         return 0;
 }
@@ -490,6 +509,8 @@ Manager* manager_free(Manager *m) {
         if (!m)
                 return NULL;
 
+        free(m->namespace);
+        free(m->runtime_directory);
         free(m->state_file);
 
         HASHMAP_FOREACH(link, m->links_by_index)

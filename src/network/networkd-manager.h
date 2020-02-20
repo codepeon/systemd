@@ -18,6 +18,9 @@
 #include "time-util.h"
 
 struct Manager {
+        char *namespace;
+        char *runtime_directory;
+
         sd_netlink *rtnl;
         /* lazy initialized */
         sd_netlink *genl;
@@ -97,7 +100,7 @@ struct Manager {
         OrderedSet *request_queue;
 };
 
-int manager_new(Manager **ret, bool test_mode);
+int manager_new(Manager **ret, const char *namespace, bool test_mode);
 Manager* manager_free(Manager *m);
 
 int manager_setup(Manager *m);

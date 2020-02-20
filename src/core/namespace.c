@@ -55,6 +55,7 @@ typedef enum MountMode {
         PRIVATE_DEV,
         BIND_DEV,
         EMPTY_DIR,
+        SYSFS_REMOUNT,
         SYSFS,
         PROCFS,
         RUN,
@@ -220,6 +221,7 @@ static const char * const mount_mode_table[_MOUNT_MODE_MAX] = {
         [PRIVATE_DEV]          = "private-dev",
         [BIND_DEV]             = "bind-dev",
         [EMPTY_DIR]            = "empty",
+        [SYSFS_REMOUNT]        = "sysfs-remount",
         [SYSFS]                = "sysfs",
         [PROCFS]               = "procfs",
         [READONLY]             = "read-only",
@@ -993,6 +995,25 @@ static int mount_bind_dev(const MountEntry *m) {
         return 1;
 }
 
+static int remount_sysfs(const MountEntry *m) {
+        int r;
+
+        assert(m);
+
+        (void) mkdir_p_label(mount_entry_path(m), 0755);
+
+        r = path_is_mount_point(mount_entry_path(m), NULL, 0);
+        if (r < 0)
+                return log_debug_errno(r, "Unable to determine whether /sys is already mounted: %m");
+        if (r > 0)
+                (void) umount(mount_entry_path(m));
+
+        if (mount("sysfs", mount_entry_path(m), "sysfs", 0, NULL) < 0)
+                return log_debug_errno(errno, "Failed to mount %s: %m", mount_entry_path(m));
+
+        return 1;
+}
+
 static int mount_sysfs(const MountEntry *m) {
         int r;
 
@@ -1337,6 +1358,9 @@ static int apply_one_mount(
         case BIND_DEV:
                 return mount_bind_dev(m);
 
+        case SYSFS_REMOUNT:
+                return remount_sysfs(m);
+
         case SYSFS:
                 return mount_sysfs(m);
 
@@ -1570,7 +1594,8 @@ static size_t namespace_calculate_mounts(
                 !!log_namespace +
                 setup_propagate + /* /run/systemd/incoming */
                 !!notify_socket +
-                ns_info->private_ipc; /* /dev/mqueue */
+                ns_info->private_ipc + /* /dev/mqueue */
+                ns_info->remount_sysfs;
 }
 
 static void normalize_mounts(const char *root_directory, MountEntry *mounts, size_t *n_mounts) {
@@ -2069,6 +2094,12 @@ int setup_namespace(
                         *(m++) = (MountEntry) {
                                 .path_const = "/sys/fs/cgroup",
                                 .mode = READONLY,
+                        };
+
+                if (ns_info->remount_sysfs)
+                        *(m++) = (MountEntry) {
+                                .path_const = "/sys",
+                                .mode = SYSFS_REMOUNT,
                         };
 
                 r = append_protect_home(&m, ns_info->protect_home, ns_info->ignore_protect_paths);

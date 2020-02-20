@@ -18,6 +18,7 @@
 #include <linux/ip.h>
 #include <linux/l2tp.h>
 #include <linux/netlink.h>
+#include <linux/net_namespace.h>
 #include <linux/nexthop.h>
 #include <linux/nl80211.h>
 #include <linux/pkt_sched.h>
@@ -1188,6 +1189,19 @@ static const NLType rtnl_mdb_types[] = {
 
 DEFINE_TYPE_SYSTEM(rtnl_mdb);
 
+static const NLType rtnl_nsid_types[] = {
+        [NETNSA_FD]           = { .type = NETLINK_TYPE_U32 },
+        [NETNSA_PID]          = { .type = NETLINK_TYPE_U32 },
+        [NETNSA_NSID]         = { .type = NETLINK_TYPE_S32 },
+        [NETNSA_TARGET_NSID]  = { .type = NETLINK_TYPE_S32 },
+        [NETNSA_CURRENT_NSID] = { .type = NETLINK_TYPE_S32 },
+};
+
+static const NLTypeSystem rtnl_nsid_type_system = {
+        .count = ELEMENTSOF(rtnl_nsid_types),
+        .types = rtnl_nsid_types,
+};
+
 static const NLType rtnl_types[] = {
         [RTM_NEWLINK]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_link_type_system,                .size = sizeof(struct ifinfomsg) },
         [RTM_DELLINK]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_link_type_system,                .size = sizeof(struct ifinfomsg) },
@@ -1223,6 +1237,9 @@ static const NLType rtnl_types[] = {
         [RTM_NEWMDB]       = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_mdb_type_system,                 .size = sizeof(struct br_port_msg) },
         [RTM_DELMDB]       = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_mdb_type_system,                 .size = sizeof(struct br_port_msg) },
         [RTM_GETMDB]       = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_mdb_type_system,                 .size = sizeof(struct br_port_msg) },
+        [RTM_NEWNSID]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_nsid_type_system,                .size = sizeof(struct rtgenmsg) },
+        [RTM_DELNSID]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_nsid_type_system,                .size = sizeof(struct rtgenmsg) },
+        [RTM_GETNSID]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_nsid_type_system,                .size = sizeof(struct rtgenmsg) },
 };
 
 DEFINE_TYPE_SYSTEM(rtnl);

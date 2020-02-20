@@ -238,6 +238,7 @@ int sd_nfnl_nft_message_add_setelem(sd_netlink_message *m,
                                     const void *key, uint32_t klen,
                                     const void *data, uint32_t dlen);
 int sd_nfnl_nft_message_add_setelem_end(sd_netlink_message *m);
+int sd_rtnl_message_new_netns(sd_netlink *rtnl, sd_netlink_message **ret, uint16_t nlmsg_type);
 
 /* genl */
 int sd_genl_socket_open(sd_netlink **ret);

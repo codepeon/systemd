@@ -3181,6 +3181,7 @@ static int apply_mount_namespace(
                         .protect_proc = context->protect_proc,
                         .proc_subset = context->proc_subset,
                         .private_ipc = context->private_ipc || context->ipc_namespace_path,
+                        .remount_sysfs = context->network_namespace_path,
                 };
         } else if (!context->dynamic_user && root_dir)
                 /*

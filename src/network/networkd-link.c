@@ -17,6 +17,7 @@
 #include "bus-util.h"
 #include "device-private.h"
 #include "device-util.h"
+#include "device-internal.h"
 #include "dhcp-identifier.h"
 #include "dhcp-lease-internal.h"
 #include "env-file.h"
@@ -1204,6 +1205,62 @@ static int link_get_network(Link *link, Network **ret) {
         return -ENOENT;
 }
 
+static int set_namespace_handler(sd_netlink *rtnl, sd_netlink_message *m, Link *link) {
+        int r;
+
+        assert(m);
+        assert(link);
+        assert(link->ifname);
+
+        if (IN_SET(link->state, LINK_STATE_FAILED, LINK_STATE_LINGER))
+                return 1;
+
+        r = sd_netlink_message_get_errno(m);
+        if (r < 0) {
+                log_link_message_warning_errno(link, m, r, "Could not set namespace, ignoring");
+                link_enter_failed(link);
+        } else
+                log_link_debug(link, "Setting namespace done.");
+
+        return 1;
+}
+
+static int link_set_namespace(Link *link) {
+        _cleanup_(sd_netlink_message_unrefp) sd_netlink_message *m = NULL;
+        _cleanup_close_ int fd = -1;
+        int r;
+
+        assert(link);
+
+        if (!link->network || !link->network->namespace)
+                return 0;
+
+        fd = open(link->network->namespace, O_RDONLY | O_CLOEXEC);
+        if (fd < 0)
+                return log_link_error_errno(link, errno, "Failed to open %s: %m", link->network->namespace);
+
+        r = sd_rtnl_message_new_link(link->manager->rtnl, &m, RTM_NEWLINK, link->ifindex);
+        if (r < 0)
+                return log_link_error_errno(link, r, "Failed to allocate netlink message: %m");
+
+        r = sd_netlink_message_set_flags(m, NLM_F_REQUEST);
+        if (r < 0)
+                return log_link_error_errno(link, r, "Failed to set NLM_F_REQUEST flag: %m");
+
+        r = sd_netlink_message_append_u32(m, IFLA_NET_NS_FD, fd);
+        if (r < 0)
+                return log_link_error_errno(link, r, "Could not append IFLA_NET_NS_FD attribute: %m");
+
+        r = netlink_call_async(link->manager->rtnl, NULL, m, set_namespace_handler,
+                               link_netlink_destroy_callback, link);
+        if (r < 0)
+                return log_link_error_errno(link, r, "Failed to send rtnetlink message: %m");
+
+        link_ref(link);
+
+        return 1;
+}
+
 static int link_reconfigure_impl(Link *link, bool force) {
         Network *network = NULL;
         NetDev *netdev = NULL;
@@ -1285,6 +1342,10 @@ static int link_reconfigure_impl(Link *link, bool force) {
 
         link_set_state(link, LINK_STATE_INITIALIZED);
         link->activated = false;
+
+        r = link_set_namespace(link);
+        if (r != 0)
+                return r;
 
         r = link_configure(link);
         if (r < 0)
@@ -1467,6 +1528,7 @@ static int link_check_initialized(Link *link) {
                         return 0;
                 }
 
+                device_prohibit_to_touch_db(device);
                 link->sd_device = sd_device_ref(device);
 
                 return link_initialized_and_synced(link);

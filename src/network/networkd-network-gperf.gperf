@@ -75,6 +75,7 @@ Link.Unmanaged,                              config_parse_bool,                 
 Link.ActivationPolicy,                       config_parse_activation_policy,                           0,                             offsetof(Network, activation_policy)
 Link.RequiredForOnline,                      config_parse_required_for_online,                         0,                             0
 Link.RequiredFamilyForOnline,                config_parse_required_family_for_online,                  0,                             offsetof(Network, required_family_for_online)
+Link.Namespace,                              config_parse_namespace,                                   0,                             0
 SR-IOV.VirtualFunction,                      config_parse_sr_iov_uint32,                               0,                             offsetof(Network, sr_iov_by_section)
 SR-IOV.VLANId,                               config_parse_sr_iov_uint32,                               0,                             offsetof(Network, sr_iov_by_section)
 SR-IOV.QualityOfService,                     config_parse_sr_iov_uint32,                               0,                             offsetof(Network, sr_iov_by_section)

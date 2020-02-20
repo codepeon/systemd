@@ -94,6 +94,7 @@ struct sd_device {
         bool is_initialized:1;
         bool sealed:1; /* don't read more information from uevent/db */
         bool db_persist:1; /* don't clean up the db when switching from initrd to real root */
+        bool allow_to_touch_db:1;
 };
 
 int device_new_aux(sd_device **ret);
@@ -113,3 +114,4 @@ int device_set_subsystem(sd_device *device, const char *subsystem);
 int device_set_drivers_subsystem(sd_device *device);
 int device_set_driver(sd_device *device, const char *driver);
 int device_set_usec_initialized(sd_device *device, usec_t when);
+void device_prohibit_to_touch_db(sd_device *device);

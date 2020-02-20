@@ -49,6 +49,7 @@ int device_new_aux(sd_device **ret) {
                 .devuid = UID_INVALID,
                 .devgid = GID_INVALID,
                 .action = _SD_DEVICE_ACTION_INVALID,
+                .allow_to_touch_db = true,
         };
 
         *ret = device;
@@ -1478,6 +1479,9 @@ int device_read_db_internal(sd_device *device, bool force) {
 
         assert(device);
 
+        if (!device->allow_to_touch_db)
+                return -EPERM;
+
         if (device->db_loaded || (!force && device->sealed))
                 return 0;
 
@@ -1488,6 +1492,12 @@ int device_read_db_internal(sd_device *device, bool force) {
         path = strjoina("/run/udev/data/", id);
 
         return device_read_db_internal_filename(device, path);
+}
+
+void device_prohibit_to_touch_db(sd_device *device) {
+        assert(device);
+
+        device->allow_to_touch_db = false;
 }
 
 _public_ int sd_device_get_is_initialized(sd_device *device) {

@@ -59,6 +59,7 @@
 #include "networkd-sysctl.h"
 #include "set.h"
 #include "socket-util.h"
+#include "stat-util.h"
 #include "stdio-util.h"
 #include "string-table.h"
 #include "strv.h"
@@ -1458,8 +1459,18 @@ static int link_check_initialized(Link *link) {
 
         assert(link);
 
-        if (!udev_available())
+        if (path_is_read_only_fs("/sys") > 0 || link->manager->namespace) {
+                /* no udev */
+                r = sd_device_new_from_ifindex(&device, link->ifindex);
+                if (r < 0) {
+                        log_link_debug_errno(link, r, "Could not find device, waiting for device initialization: %m");
+                        return 0;
+                }
+
+                link->sd_device = sd_device_ref(device);
+
                 return link_initialized_and_synced(link);
+        }
 
         /* udev should be around */
         r = sd_device_new_from_ifindex(&device, link->ifindex);
@@ -2466,13 +2477,13 @@ static int link_new(Manager *manager, sd_netlink_message *message, Link **ret) {
 
         if (!manager->test_mode) {
                 /* Do not update state files when running in test mode. */
-                if (asprintf(&state_file, "/run/systemd/netif/links/%d", ifindex) < 0)
+                if (asprintf(&state_file, "%s/links/%d", manager->runtime_directory, ifindex) < 0)
                         return log_oom_debug();
 
-                if (asprintf(&lease_file, "/run/systemd/netif/leases/%d", ifindex) < 0)
+                if (asprintf(&lease_file, "%s/leases/%d", manager->runtime_directory, ifindex) < 0)
                         return log_oom_debug();
 
-                if (asprintf(&lldp_file, "/run/systemd/netif/lldp/%d", ifindex) < 0)
+                if (asprintf(&lldp_file, "%s/lldp/%d", manager->runtime_directory, ifindex) < 0)
                         return log_oom_debug();
         }
 

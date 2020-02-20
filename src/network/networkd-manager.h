@@ -18,6 +18,9 @@
 #include "time-util.h"
 
 struct Manager {
+        char *namespace;
+        char *runtime_directory;
+
         sd_netlink *rtnl;
         /* lazy initialized */
         sd_netlink *genl;
@@ -89,7 +92,7 @@ struct Manager {
         FirewallContext *fw_ctx;
 };
 
-int manager_new(Manager **ret);
+int manager_new(Manager **ret, const char *namespace);
 Manager* manager_free(Manager *m);
 
 int manager_connect_bus(Manager *m);

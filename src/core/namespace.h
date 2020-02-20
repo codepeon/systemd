@@ -75,6 +75,7 @@ struct NamespaceInfo {
         bool protect_hostname;
         bool private_ipc;
         bool mount_nosuid;
+        bool remount_sysfs;
         ProtectHome protect_home;
         ProtectSystem protect_system;
         ProtectProc protect_proc;

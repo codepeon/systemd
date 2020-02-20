@@ -919,6 +919,9 @@ static int device_tag(sd_device *device, const char *tag, bool add) {
         assert(device);
         assert(tag);
 
+        if (!device->allow_to_touch_db)
+                return -EPERM;
+
         r = device_get_device_id(device, &id);
         if (r < 0)
                 return r;
@@ -998,6 +1001,9 @@ int device_update_db(sd_device *device) {
         int r;
 
         assert(device);
+
+        if (!device->allow_to_touch_db)
+                return -EPERM;
 
         has_info = device_has_info(device);
 
@@ -1101,6 +1107,9 @@ int device_delete_db(sd_device *device) {
         int r;
 
         assert(device);
+
+        if (!device->allow_to_touch_db)
+                return -EPERM;
 
         r = device_get_device_id(device, &id);
         if (r < 0)

@@ -6,7 +6,7 @@
 
 #include "macro.h"
 
-bool network_is_online(void);
+bool network_is_online(const char *network_namespace);
 
 typedef enum AddressFamily {
         /* This is a bitmask, though it usually doesn't feel that way! */
@@ -83,4 +83,4 @@ typedef struct LinkOperationalStateRange {
                                                                    LINK_OPERSTATE_ROUTABLE }
 
 int parse_operational_state_range(const char *str, LinkOperationalStateRange *out);
-int network_link_get_operational_state(int ifindex, LinkOperationalState *ret);
+int network_link_get_operational_state(int ifindex, const char *namespace, LinkOperationalState *ret);

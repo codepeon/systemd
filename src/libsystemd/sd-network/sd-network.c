@@ -18,13 +18,19 @@
 #include "strv.h"
 #include "util.h"
 
-static int network_get_string(const char *field, char **ret) {
-        _cleanup_free_ char *s = NULL;
+static int network_get_string(const char *field, const char *network_namespace, char **ret) {
+        _cleanup_free_ char *p = NULL, *s = NULL;
         int r;
 
         assert_return(ret, -EINVAL);
 
-        r = parse_env_file(NULL, "/run/systemd/netif/state", field, &s);
+        if (network_namespace) {
+                p = strjoin("/run/systemd/netif.", network_namespace, "/state");
+                if (!p)
+                        return -ENOMEM;
+        }
+
+        r = parse_env_file(NULL, p ?: "/run/systemd/netif/state", field, &s);
         if (r == -ENOENT)
                 return -ENODATA;
         if (r < 0)
@@ -37,38 +43,44 @@ static int network_get_string(const char *field, char **ret) {
         return 0;
 }
 
-int sd_network_get_operational_state(char **state) {
-        return network_get_string("OPER_STATE", state);
+int sd_network_get_operational_state(const char *network_namespace, char **state) {
+        return network_get_string("OPER_STATE", network_namespace, state);
 }
 
-int sd_network_get_carrier_state(char **state) {
-        return network_get_string("CARRIER_STATE", state);
+int sd_network_get_carrier_state(const char *network_namespace, char **state) {
+        return network_get_string("CARRIER_STATE", network_namespace, state);
 }
 
-int sd_network_get_address_state(char **state) {
-        return network_get_string("ADDRESS_STATE", state);
+int sd_network_get_address_state(const char *network_namespace, char **state) {
+        return network_get_string("ADDRESS_STATE", network_namespace, state);
 }
 
-int sd_network_get_ipv4_address_state(char **state) {
-        return network_get_string("IPV4_ADDRESS_STATE", state);
+int sd_network_get_ipv4_address_state(const char *network_namespace, char **state) {
+        return network_get_string("IPV4_ADDRESS_STATE", network_namespace, state);
 }
 
-int sd_network_get_ipv6_address_state(char **state) {
-        return network_get_string("IPV6_ADDRESS_STATE", state);
+int sd_network_get_ipv6_address_state(const char *network_namespace, char **state) {
+        return network_get_string("IPV6_ADDRESS_STATE", network_namespace, state);
 }
 
-int sd_network_get_online_state(char **state) {
-        return network_get_string("ONLINE_STATE", state);
+int sd_network_get_online_state(const char *network_namespace, char **state) {
+        return network_get_string("ONLINE_STATE", network_namespace, state);
 }
 
-static int network_get_strv(const char *key, char ***ret) {
+static int network_get_strv(const char *key, const char *network_namespace, char ***ret) {
         _cleanup_strv_free_ char **a = NULL;
-        _cleanup_free_ char *s = NULL;
+        _cleanup_free_ char *p = NULL, *s = NULL;
         int r;
 
         assert_return(ret, -EINVAL);
 
-        r = parse_env_file(NULL, "/run/systemd/netif/state", key, &s);
+        if (network_namespace) {
+                p = strjoin("/run/systemd/netif.", network_namespace, "/state");
+                if (!p)
+                        return -ENOMEM;
+        }
+
+        r = parse_env_file(NULL, p ?: "/run/systemd/netif/state", key, &s);
         if (r == -ENOENT)
                 return -ENODATA;
         if (r < 0)
@@ -90,33 +102,37 @@ static int network_get_strv(const char *key, char ***ret) {
         return r;
 }
 
-int sd_network_get_dns(char ***ret) {
-        return network_get_strv("DNS", ret);
+int sd_network_get_dns(const char *network_namespace, char ***ret) {
+        return network_get_strv("DNS", network_namespace, ret);
 }
 
-int sd_network_get_ntp(char ***ret) {
-        return network_get_strv("NTP", ret);
+int sd_network_get_ntp(const char *network_namespace, char ***ret) {
+        return network_get_strv("NTP", network_namespace, ret);
 }
 
-int sd_network_get_search_domains(char ***ret) {
-        return network_get_strv("DOMAINS", ret);
+int sd_network_get_search_domains(const char *network_namespace, char ***ret) {
+        return network_get_strv("DOMAINS", network_namespace, ret);
 }
 
-int sd_network_get_route_domains(char ***ret) {
-        return network_get_strv("ROUTE_DOMAINS", ret);
+int sd_network_get_route_domains(const char *network_namespace, char ***ret) {
+        return network_get_strv("ROUTE_DOMAINS", network_namespace, ret);
 }
 
-static int network_link_get_string(int ifindex, const char *field, char **ret) {
-        char path[STRLEN("/run/systemd/netif/links/") + DECIMAL_STR_MAX(ifindex)];
-        _cleanup_free_ char *s = NULL;
+static int network_link_get_string(int ifindex, const char *field, const char *network_namespace, char **ret) {
+        _cleanup_free_ char *p = NULL, *s = NULL;
         int r;
 
         assert_return(ifindex > 0, -EINVAL);
         assert_return(ret, -EINVAL);
 
-        xsprintf(path, "/run/systemd/netif/links/%i", ifindex);
+        if (network_namespace)
+                r = asprintf(&p, "/run/systemd/netif.%s/links/%i", network_namespace, ifindex);
+        else
+                r = asprintf(&p, "/run/systemd/netif/links/%i", ifindex);
+        if (r < 0)
+                return -ENOMEM;
 
-        r = parse_env_file(NULL, path, field, &s);
+        r = parse_env_file(NULL, p, field, &s);
         if (r == -ENOENT)
                 return -ENODATA;
         if (r < 0)
@@ -129,17 +145,22 @@ static int network_link_get_string(int ifindex, const char *field, char **ret) {
         return 0;
 }
 
-static int network_link_get_strv(int ifindex, const char *key, char ***ret) {
-        char path[STRLEN("/run/systemd/netif/links/") + DECIMAL_STR_MAX(ifindex)];
+static int network_link_get_strv(int ifindex, const char *key, const char *network_namespace, char ***ret) {
         _cleanup_strv_free_ char **a = NULL;
-        _cleanup_free_ char *s = NULL;
+        _cleanup_free_ char *p = NULL, *s = NULL;
         int r;
 
         assert_return(ifindex > 0, -EINVAL);
         assert_return(ret, -EINVAL);
 
-        xsprintf(path, "/run/systemd/netif/links/%i", ifindex);
-        r = parse_env_file(NULL, path, key, &s);
+        if (network_namespace)
+                r = asprintf(&p, "/run/systemd/netif.%s/links/%i", network_namespace, ifindex);
+        else
+                r = asprintf(&p, "/run/systemd/netif/links/%i", ifindex);
+        if (r < 0)
+                return -ENOMEM;
+
+        r = parse_env_file(NULL, p, key, &s);
         if (r == -ENOENT)
                 return -ENODATA;
         if (r < 0)
@@ -161,25 +182,25 @@ static int network_link_get_strv(int ifindex, const char *key, char ***ret) {
         return r;
 }
 
-int sd_network_link_get_setup_state(int ifindex, char **state) {
-        return network_link_get_string(ifindex, "ADMIN_STATE", state);
+int sd_network_link_get_setup_state(int ifindex, const char *network_namespace, char **state) {
+        return network_link_get_string(ifindex, "ADMIN_STATE", network_namespace, state);
 }
 
-int sd_network_link_get_network_file(int ifindex, char **filename) {
-        return network_link_get_string(ifindex, "NETWORK_FILE", filename);
+int sd_network_link_get_network_file(int ifindex, const char *network_namespace, char **filename) {
+        return network_link_get_string(ifindex, "NETWORK_FILE", network_namespace, filename);
 }
 
-int sd_network_link_get_operational_state(int ifindex, char **state) {
-        return network_link_get_string(ifindex, "OPER_STATE", state);
+int sd_network_link_get_operational_state(int ifindex, const char *network_namespace, char **state) {
+        return network_link_get_string(ifindex, "OPER_STATE", network_namespace, state);
 }
 
-int sd_network_link_get_required_family_for_online(int ifindex, char **state) {
+int sd_network_link_get_required_family_for_online(int ifindex, const char *network_namespace, char **state) {
         _cleanup_free_ char *s = NULL;
         int r;
 
         assert_return(state, -EINVAL);
 
-        r = network_link_get_string(ifindex, "REQUIRED_FAMILY_FOR_ONLINE", &s);
+        r = network_link_get_string(ifindex, "REQUIRED_FAMILY_FOR_ONLINE", network_namespace, &s);
         if (r < 0) {
                 if (r != -ENODATA)
                         return r;
@@ -193,39 +214,39 @@ int sd_network_link_get_required_family_for_online(int ifindex, char **state) {
         return 0;
 }
 
-int sd_network_link_get_carrier_state(int ifindex, char **state) {
-        return network_link_get_string(ifindex, "CARRIER_STATE", state);
+int sd_network_link_get_carrier_state(int ifindex, const char *network_namespace, char **state) {
+        return network_link_get_string(ifindex, "CARRIER_STATE", network_namespace, state);
 }
 
-int sd_network_link_get_address_state(int ifindex, char **state) {
-        return network_link_get_string(ifindex, "ADDRESS_STATE", state);
+int sd_network_link_get_address_state(int ifindex, const char *network_namespace, char **state) {
+        return network_link_get_string(ifindex, "ADDRESS_STATE", network_namespace, state);
 }
 
-int sd_network_link_get_ipv4_address_state(int ifindex, char **state) {
-        return network_link_get_string(ifindex, "IPV4_ADDRESS_STATE", state);
+int sd_network_link_get_ipv4_address_state(int ifindex, const char *network_namespace, char **state) {
+        return network_link_get_string(ifindex, "IPV4_ADDRESS_STATE", network_namespace, state);
 }
 
-int sd_network_link_get_ipv6_address_state(int ifindex, char **state) {
-        return network_link_get_string(ifindex, "IPV6_ADDRESS_STATE", state);
+int sd_network_link_get_ipv6_address_state(int ifindex, const char *network_namespace, char **state) {
+        return network_link_get_string(ifindex, "IPV6_ADDRESS_STATE", network_namespace, state);
 }
 
-int sd_network_link_get_online_state(int ifindex, char **state) {
-        return network_link_get_string(ifindex, "ONLINE_STATE", state);
+int sd_network_link_get_online_state(int ifindex, const char *network_namespace, char **state) {
+        return network_link_get_string(ifindex, "ONLINE_STATE", network_namespace, state);
 }
 
-int sd_network_link_get_dhcp6_client_iaid_string(int ifindex, char **iaid) {
-        return network_link_get_string(ifindex, "DHCP6_CLIENT_IAID", iaid);
+int sd_network_link_get_dhcp6_client_iaid_string(int ifindex, const char *network_namespace, char **iaid) {
+        return network_link_get_string(ifindex, "DHCP6_CLIENT_IAID", network_namespace, iaid);
 }
 
-int sd_network_link_get_dhcp6_client_duid_string(int ifindex, char **duid) {
-        return network_link_get_string(ifindex, "DHCP6_CLIENT_DUID", duid);
+int sd_network_link_get_dhcp6_client_duid_string(int ifindex, const char *network_namespace, char **duid) {
+        return network_link_get_string(ifindex, "DHCP6_CLIENT_DUID", network_namespace, duid);
 }
 
-int sd_network_link_get_required_for_online(int ifindex) {
+int sd_network_link_get_required_for_online(int ifindex, const char *network_namespace) {
         _cleanup_free_ char *s = NULL;
         int r;
 
-        r = network_link_get_string(ifindex, "REQUIRED_FOR_ONLINE", &s);
+        r = network_link_get_string(ifindex, "REQUIRED_FOR_ONLINE", network_namespace, &s);
         if (r < 0) {
                 /* Handle -ENODATA as RequiredForOnline=yes, for compatibility */
                 if (r == -ENODATA)
@@ -236,13 +257,13 @@ int sd_network_link_get_required_for_online(int ifindex) {
         return parse_boolean(s);
 }
 
-int sd_network_link_get_required_operstate_for_online(int ifindex, char **state) {
+int sd_network_link_get_required_operstate_for_online(int ifindex, const char *network_namespace, char **state) {
         _cleanup_free_ char *s = NULL;
         int r;
 
         assert_return(state, -EINVAL);
 
-        r = network_link_get_string(ifindex, "REQUIRED_OPER_STATE_FOR_ONLINE", &s);
+        r = network_link_get_string(ifindex, "REQUIRED_OPER_STATE_FOR_ONLINE", network_namespace, &s);
         if (r < 0) {
                 if (r != -ENODATA)
                         return r;
@@ -257,13 +278,13 @@ int sd_network_link_get_required_operstate_for_online(int ifindex, char **state)
         return 0;
 }
 
-int sd_network_link_get_activation_policy(int ifindex, char **policy) {
+int sd_network_link_get_activation_policy(int ifindex, const char *network_namespace, char **policy) {
         _cleanup_free_ char *s = NULL;
         int r;
 
         assert_return(policy, -EINVAL);
 
-        r = network_link_get_string(ifindex, "ACTIVATION_POLICY", &s);
+        r = network_link_get_string(ifindex, "ACTIVATION_POLICY", network_namespace, &s);
         if (r < 0) {
                 if (r != -ENODATA)
                         return r;
@@ -278,56 +299,60 @@ int sd_network_link_get_activation_policy(int ifindex, char **policy) {
         return 0;
 }
 
-int sd_network_link_get_llmnr(int ifindex, char **llmnr) {
-        return network_link_get_string(ifindex, "LLMNR", llmnr);
+int sd_network_link_get_llmnr(int ifindex, const char *network_namespace, char **llmnr) {
+        return network_link_get_string(ifindex, "LLMNR", network_namespace, llmnr);
 }
 
-int sd_network_link_get_mdns(int ifindex, char **mdns) {
-        return network_link_get_string(ifindex, "MDNS", mdns);
+int sd_network_link_get_mdns(int ifindex, const char *network_namespace, char **mdns) {
+        return network_link_get_string(ifindex, "MDNS", network_namespace, mdns);
 }
 
-int sd_network_link_get_dns_over_tls(int ifindex, char **dns_over_tls) {
-        return network_link_get_string(ifindex, "DNS_OVER_TLS", dns_over_tls);
+int sd_network_link_get_dns_over_tls(int ifindex, const char *network_namespace, char **dns_over_tls) {
+        return network_link_get_string(ifindex, "DNS_OVER_TLS", network_namespace, dns_over_tls);
 }
 
-int sd_network_link_get_dnssec(int ifindex, char **dnssec) {
-        return network_link_get_string(ifindex, "DNSSEC", dnssec);
+int sd_network_link_get_dnssec(int ifindex, const char *network_namespace, char **dnssec) {
+        return network_link_get_string(ifindex, "DNSSEC", network_namespace, dnssec);
 }
 
-int sd_network_link_get_dnssec_negative_trust_anchors(int ifindex, char ***nta) {
-        return network_link_get_strv(ifindex, "DNSSEC_NTA", nta);
+int sd_network_link_get_dnssec_negative_trust_anchors(int ifindex, const char *network_namespace, char ***nta) {
+        return network_link_get_strv(ifindex, "DNSSEC_NTA", network_namespace, nta);
 }
 
-int sd_network_link_get_dns(int ifindex, char ***ret) {
-        return network_link_get_strv(ifindex, "DNS", ret);
+int sd_network_link_get_dns(int ifindex, const char *network_namespace, char ***ret) {
+        return network_link_get_strv(ifindex, "DNS", network_namespace, ret);
 }
 
-int sd_network_link_get_ntp(int ifindex, char ***ret) {
-        return network_link_get_strv(ifindex, "NTP", ret);
+int sd_network_link_get_ntp(int ifindex, const char *network_namespace, char ***ret) {
+        return network_link_get_strv(ifindex, "NTP", network_namespace, ret);
 }
 
-int sd_network_link_get_sip(int ifindex, char ***ret) {
-        return network_link_get_strv(ifindex, "SIP", ret);
+int sd_network_link_get_sip(int ifindex, const char *network_namespace, char ***ret) {
+        return network_link_get_strv(ifindex, "SIP", network_namespace, ret);
 }
 
-int sd_network_link_get_search_domains(int ifindex, char ***ret) {
-        return network_link_get_strv(ifindex, "DOMAINS", ret);
+int sd_network_link_get_search_domains(int ifindex, const char *network_namespace, char ***ret) {
+        return network_link_get_strv(ifindex, "DOMAINS", network_namespace, ret);
 }
 
-int sd_network_link_get_route_domains(int ifindex, char ***ret) {
-        return network_link_get_strv(ifindex, "ROUTE_DOMAINS", ret);
+int sd_network_link_get_route_domains(int ifindex, const char *network_namespace, char ***ret) {
+        return network_link_get_strv(ifindex, "ROUTE_DOMAINS", network_namespace, ret);
 }
 
-int sd_network_link_get_dns_default_route(int ifindex) {
-        char path[STRLEN("/run/systemd/netif/links/") + DECIMAL_STR_MAX(ifindex)];
-        _cleanup_free_ char *s = NULL;
+int sd_network_link_get_dns_default_route(int ifindex, const char *network_namespace) {
+        _cleanup_free_ char *p = NULL, *s = NULL;
         int r;
 
         assert_return(ifindex > 0, -EINVAL);
 
-        xsprintf(path, "/run/systemd/netif/links/%i", ifindex);
+        if (network_namespace)
+                r = asprintf(&p, "/run/systemd/netif.%s/links/%i", network_namespace, ifindex);
+        else
+                r = asprintf(&p, "/run/systemd/netif/links/%i", ifindex);
+        if (r < 0)
+                return -ENOMEM;
 
-        r = parse_env_file(NULL, path, "DNS_DEFAULT_ROUTE", &s);
+        r = parse_env_file(NULL, p, "DNS_DEFAULT_ROUTE", &s);
         if (r == -ENOENT)
                 return -ENODATA;
         if (r < 0)
@@ -337,18 +362,23 @@ int sd_network_link_get_dns_default_route(int ifindex) {
         return parse_boolean(s);
 }
 
-static int network_link_get_ifindexes(int ifindex, const char *key, int **ret) {
-        char path[STRLEN("/run/systemd/netif/links/") + DECIMAL_STR_MAX(ifindex)];
+static int network_link_get_ifindexes(int ifindex, const char *key, const char *network_namespace, int **ret) {
+        _cleanup_free_ char *p = NULL, *s = NULL;
         _cleanup_free_ int *ifis = NULL;
-        _cleanup_free_ char *s = NULL;
         size_t c = 0;
         int r;
 
         assert_return(ifindex > 0, -EINVAL);
         assert_return(ret, -EINVAL);
 
-        xsprintf(path, "/run/systemd/netif/links/%i", ifindex);
-        r = parse_env_file(NULL, path, key, &s);
+        if (network_namespace)
+                r = asprintf(&p, "/run/systemd/netif.%s/links/%i", network_namespace, ifindex);
+        else
+                r = asprintf(&p, "/run/systemd/netif/links/%i", ifindex);
+        if (r < 0)
+                return -ENOMEM;
+
+        r = parse_env_file(NULL, p, key, &s);
         if (r == -ENOENT)
                 return -ENODATA;
         if (r < 0)
@@ -379,12 +409,12 @@ static int network_link_get_ifindexes(int ifindex, const char *key, int **ret) {
         return c;
 }
 
-int sd_network_link_get_carrier_bound_to(int ifindex, int **ret) {
-        return network_link_get_ifindexes(ifindex, "CARRIER_BOUND_TO", ret);
+int sd_network_link_get_carrier_bound_to(int ifindex, const char *network_namespace, int **ret) {
+        return network_link_get_ifindexes(ifindex, "CARRIER_BOUND_TO", network_namespace, ret);
 }
 
-int sd_network_link_get_carrier_bound_by(int ifindex, int **ret) {
-        return network_link_get_ifindexes(ifindex, "CARRIER_BOUND_BY", ret);
+int sd_network_link_get_carrier_bound_by(int ifindex, const char *network_namespace, int **ret) {
+        return network_link_get_ifindexes(ifindex, "CARRIER_BOUND_BY", network_namespace, ret);
 }
 
 int sd_network_link_get_stat(int ifindex, struct stat *ret) {
@@ -412,16 +442,30 @@ static sd_network_monitor* FD_TO_MONITOR(int fd) {
         return (sd_network_monitor*) (unsigned long) (fd + 1);
 }
 
-static int monitor_add_inotify_watch(int fd) {
+static int monitor_add_inotify_watch(int fd, const char *network_namespace) {
+        _cleanup_free_ char *p = NULL;
         int k;
 
-        k = inotify_add_watch(fd, "/run/systemd/netif/links/", IN_MOVED_TO|IN_DELETE);
+        if (network_namespace) {
+                p = strjoin("/run/systemd/netif.", network_namespace, "/links/");
+                if (!p)
+                        return -ENOMEM;
+        }
+
+        k = inotify_add_watch(fd, p ?: "/run/systemd/netif/links/", IN_MOVED_TO|IN_DELETE);
         if (k >= 0)
                 return 0;
         else if (errno != ENOENT)
                 return -errno;
 
-        k = inotify_add_watch(fd, "/run/systemd/netif/", IN_CREATE|IN_ISDIR);
+        p = mfree(p);
+        if (network_namespace) {
+                p = strjoin("/run/systemd/netif.", network_namespace, "/");
+                if (!p)
+                        return -ENOMEM;
+        }
+
+        k = inotify_add_watch(fd, p ?: "/run/systemd/netif/", IN_CREATE|IN_ISDIR);
         if (k >= 0)
                 return 0;
         else if (errno != ENOENT)
@@ -434,7 +478,7 @@ static int monitor_add_inotify_watch(int fd) {
         return 0;
 }
 
-int sd_network_monitor_new(sd_network_monitor **m, const char *category) {
+int sd_network_monitor_new(sd_network_monitor **m, const char *category, const char *network_namespace) {
         _cleanup_close_ int fd = -1;
         int k;
         bool good = false;
@@ -446,7 +490,7 @@ int sd_network_monitor_new(sd_network_monitor **m, const char *category) {
                 return -errno;
 
         if (!category || streq(category, "links")) {
-                k = monitor_add_inotify_watch(fd);
+                k = monitor_add_inotify_watch(fd, network_namespace);
                 if (k < 0)
                         return k;
 
@@ -467,7 +511,7 @@ sd_network_monitor* sd_network_monitor_unref(sd_network_monitor *m) {
         return NULL;
 }
 
-int sd_network_monitor_flush(sd_network_monitor *m) {
+int sd_network_monitor_flush(sd_network_monitor *m, const char *network_namespace) {
         union inotify_event_buffer buffer;
         struct inotify_event *e;
         ssize_t l;
@@ -487,7 +531,7 @@ int sd_network_monitor_flush(sd_network_monitor *m) {
 
         FOREACH_INOTIFY_EVENT(e, buffer, l) {
                 if (e->mask & IN_ISDIR) {
-                        k = monitor_add_inotify_watch(fd);
+                        k = monitor_add_inotify_watch(fd, network_namespace);
                         if (k < 0)
                                 return k;
 

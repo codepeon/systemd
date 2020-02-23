@@ -104,14 +104,14 @@ int link_update_monitor(Link *l) {
         assert(l);
         assert(l->ifname);
 
-        r = sd_network_link_get_required_for_online(l->ifindex);
+        r = sd_network_link_get_required_for_online(l->ifindex, NULL);
         if (r < 0)
                 ret = log_link_debug_errno(l, r, "Failed to determine whether the link is required for online or not, "
                                            "ignoring: %m");
         else
                 l->required_for_online = r > 0;
 
-        r = sd_network_link_get_required_operstate_for_online(l->ifindex, &required_operstate);
+        r = sd_network_link_get_required_operstate_for_online(l->ifindex, NULL, &required_operstate);
         if (r < 0)
                 ret = log_link_debug_errno(l, r, "Failed to get required operational state, ignoring: %m");
         else if (isempty(required_operstate))
@@ -123,11 +123,11 @@ int link_update_monitor(Link *l) {
                                                    "Failed to parse required operational state, ignoring: %m");
         }
 
-        r = network_link_get_operational_state(l->ifindex, &l->operational_state);
+        r = network_link_get_operational_state(l->ifindex, NULL, &l->operational_state);
         if (r < 0)
                 ret = log_link_debug_errno(l, r, "Failed to get operational state, ignoring: %m");
 
-        r = sd_network_link_get_required_family_for_online(l->ifindex, &required_family);
+        r = sd_network_link_get_required_family_for_online(l->ifindex, NULL, &required_family);
         if (r < 0)
                 ret = log_link_debug_errno(l, r, "Failed to get required address family, ignoring: %m");
         else if (isempty(required_family))
@@ -142,7 +142,7 @@ int link_update_monitor(Link *l) {
                         l->required_family = f;
         }
 
-        r = sd_network_link_get_ipv4_address_state(l->ifindex, &ipv4_address_state);
+        r = sd_network_link_get_ipv4_address_state(l->ifindex, NULL, &ipv4_address_state);
         if (r < 0)
                 ret = log_link_debug_errno(l, r, "Failed to get IPv4 address state, ignoring: %m");
         else {
@@ -155,7 +155,7 @@ int link_update_monitor(Link *l) {
                         l->ipv4_address_state = s;
         }
 
-        r = sd_network_link_get_ipv6_address_state(l->ifindex, &ipv6_address_state);
+        r = sd_network_link_get_ipv6_address_state(l->ifindex, NULL, &ipv6_address_state);
         if (r < 0)
                 ret = log_link_debug_errno(l, r, "Failed to get IPv6 address state, ignoring: %m");
         else {
@@ -168,7 +168,7 @@ int link_update_monitor(Link *l) {
                         l->ipv6_address_state = s;
         }
 
-        r = sd_network_link_get_setup_state(l->ifindex, &state);
+        r = sd_network_link_get_setup_state(l->ifindex, NULL, &state);
         if (r < 0)
                 ret = log_link_debug_errno(l, r, "Failed to get setup state, ignoring: %m");
         else

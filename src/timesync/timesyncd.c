@@ -156,7 +156,7 @@ static int run(int argc, char *argv[]) {
         if (r < 0)
                 return r;
 
-        if (network_is_online()) {
+        if (network_is_online(NULL)) {
                 r = manager_connect(m);
                 if (r < 0)
                         return r;

@@ -49,26 +49,26 @@ _SD_BEGIN_DECLARATIONS;
  * Possible return codes:
  *   -ENODATA: networkd is not aware of any links
  */
-int sd_network_get_operational_state(char **state);
-int sd_network_get_carrier_state(char **state);
-int sd_network_get_address_state(char **state);
-int sd_network_get_ipv4_address_state(char **state);
-int sd_network_get_ipv6_address_state(char **state);
-int sd_network_get_online_state(char **state);
+int sd_network_get_operational_state(const char *network_namespace, char **state);
+int sd_network_get_carrier_state(const char *network_namespace, char **state);
+int sd_network_get_address_state(const char *network_namespace, char **state);
+int sd_network_get_ipv4_address_state(const char *network_namespace, char **state);
+int sd_network_get_ipv6_address_state(const char *network_namespace, char **state);
+int sd_network_get_online_state(const char *network_namespace, char **state);
 
 /* Get DNS entries for all links. These are string representations of
  * IP addresses */
-int sd_network_get_dns(char ***dns);
+int sd_network_get_dns(const char *network_namespace, char ***dns);
 
 /* Get NTP entries for all links. These are domain names or string
  * representations of IP addresses */
-int sd_network_get_ntp(char ***ntp);
+int sd_network_get_ntp(const char *network_namespace, char ***ntp);
 
 /* Get the search domains for all links. */
-int sd_network_get_search_domains(char ***domains);
+int sd_network_get_search_domains(const char *network_namespace, char ***domains);
 
 /* Get the search domains for all links. */
-int sd_network_get_route_domains(char ***domains);
+int sd_network_get_route_domains(const char *network_namespace, char ***domains);
 
 /* Get setup state from ifindex.
  * Possible states:
@@ -81,7 +81,7 @@ int sd_network_get_route_domains(char ***domains);
  * Possible return codes:
  *   -ENODATA: networkd is not aware of the link
  */
-int sd_network_link_get_setup_state(int ifindex, char **state);
+int sd_network_link_get_setup_state(int ifindex, const char *network_namespace, char **state);
 
 /* Get operational state from ifindex.
  * Possible states:
@@ -94,14 +94,14 @@ int sd_network_link_get_setup_state(int ifindex, char **state);
  * Possible return codes:
  *   -ENODATA: networkd is not aware of the link
  */
-int sd_network_link_get_operational_state(int ifindex, char **state);
-int sd_network_link_get_required_operstate_for_online(int ifindex, char **state);
-int sd_network_link_get_required_family_for_online(int ifindex, char **state);
-int sd_network_link_get_carrier_state(int ifindex, char **state);
-int sd_network_link_get_address_state(int ifindex, char **state);
-int sd_network_link_get_ipv4_address_state(int ifindex, char **state);
-int sd_network_link_get_ipv6_address_state(int ifindex, char **state);
-int sd_network_link_get_online_state(int ifindex, char **state);
+int sd_network_link_get_operational_state(int ifindex, const char *network_namespace, char **state);
+int sd_network_link_get_required_operstate_for_online(int ifindex, const char *network_namespace, char **state);
+int sd_network_link_get_required_family_for_online(int ifindex, const char *network_namespace, char **state);
+int sd_network_link_get_carrier_state(int ifindex, const char *network_namespace, char **state);
+int sd_network_link_get_address_state(int ifindex, const char *network_namespace, char **state);
+int sd_network_link_get_ipv4_address_state(int ifindex, const char *network_namespace, char **state);
+int sd_network_link_get_ipv6_address_state(int ifindex, const char *network_namespace, char **state);
+int sd_network_link_get_online_state(int ifindex, const char *network_namespace, char **state);
 
 /* Indicates whether the network is relevant to being online.
  * Possible return codes:
@@ -109,34 +109,34 @@ int sd_network_link_get_online_state(int ifindex, char **state);
  *   1: the connection is required to consider the system online
  *   <0: networkd is not aware of the link
  */
-int sd_network_link_get_required_for_online(int ifindex);
+int sd_network_link_get_required_for_online(int ifindex, const char *network_namespace);
 
 /* Get activation policy for ifindex.
  * Possible values are as specified for ActivationPolicy=
  */
-int sd_network_link_get_activation_policy(int ifindex, char **policy);
+int sd_network_link_get_activation_policy(int ifindex, const char *network_namespace, char **policy);
 
 /* Get path to .network file applied to link */
-int sd_network_link_get_network_file(int ifindex, char **filename);
+int sd_network_link_get_network_file(int ifindex, const char *network_namespace, char **filename);
 
 /* Get DNS entries for a given link. These are string representations of
  * IP addresses */
-int sd_network_link_get_dns(int ifindex, char ***ret);
+int sd_network_link_get_dns(int ifindex, const char *network_namespace, char ***ret);
 
 /* Get NTP entries for a given link. These are domain names or string
  * representations of IP addresses */
-int sd_network_link_get_ntp(int ifindex, char ***ret);
+int sd_network_link_get_ntp(int ifindex, const char *network_namespace, char ***ret);
 
 /* Get SIP entries for a given link. These are string
  * representations of IP addresses */
-int sd_network_link_get_sip(int ifindex, char ***ret);
+int sd_network_link_get_sip(int ifindex, const char *network_namespace, char ***ret);
 
 /* Indicates whether or not LLMNR should be enabled for the link
  * Possible levels of support: yes, no, resolve
  * Possible return codes:
  *   -ENODATA: networkd is not aware of the link
  */
-int sd_network_link_get_llmnr(int ifindex, char **llmnr);
+int sd_network_link_get_llmnr(int ifindex, const char *network_namespace, char **llmnr);
 
 /* Indicates whether or not MulticastDNS should be enabled for the
  * link.
@@ -144,7 +144,7 @@ int sd_network_link_get_llmnr(int ifindex, char **llmnr);
  * Possible return codes:
  *   -ENODATA: networkd is not aware of the link
  */
-int sd_network_link_get_mdns(int ifindex, char **mdns);
+int sd_network_link_get_mdns(int ifindex, const char *network_namespace, char **mdns);
 
 /* Indicates whether or not DNS-over-TLS should be enabled for the
  * link.
@@ -152,41 +152,41 @@ int sd_network_link_get_mdns(int ifindex, char **mdns);
  * Possible return codes:
  *   -ENODATA: networkd is not aware of the link
  */
-int sd_network_link_get_dns_over_tls(int ifindex, char **dns_over_tls);
+int sd_network_link_get_dns_over_tls(int ifindex, const char *network_namespace, char **dns_over_tls);
 
 /* Indicates whether or not DNSSEC should be enabled for the link
  * Possible levels of support: yes, no, allow-downgrade
  * Possible return codes:
  *   -ENODATA: networkd is not aware of the link
  */
-int sd_network_link_get_dnssec(int ifindex, char **dnssec);
+int sd_network_link_get_dnssec(int ifindex, const char *network_namespace, char **dnssec);
 
 /* Returns the list of per-interface DNSSEC negative trust anchors
  * Possible return codes:
  *   -ENODATA: networkd is not aware of the link, or has no such data
  */
-int sd_network_link_get_dnssec_negative_trust_anchors(int ifindex, char ***nta);
+int sd_network_link_get_dnssec_negative_trust_anchors(int ifindex, const char *network_namespace, char ***nta);
 
 /* Get the search DNS domain names for a given link. */
-int sd_network_link_get_search_domains(int ifindex, char ***domains);
+int sd_network_link_get_search_domains(int ifindex, const char *network_namespace, char ***domains);
 
 /* Get the route DNS domain names for a given link. */
-int sd_network_link_get_route_domains(int ifindex, char ***domains);
+int sd_network_link_get_route_domains(int ifindex, const char *network_namespace, char ***domains);
 
 /* Get whether this link shall be used as 'default route' for DNS queries */
-int sd_network_link_get_dns_default_route(int ifindex);
+int sd_network_link_get_dns_default_route(int ifindex, const char *network_namespace);
 
 /* Get the carrier interface indexes to which current link is bound to. */
-int sd_network_link_get_carrier_bound_to(int ifindex, int **ifindexes);
+int sd_network_link_get_carrier_bound_to(int ifindex, const char *network_namespace, int **ifindexes);
 
 /* Get the CARRIERS that are bound to current link. */
-int sd_network_link_get_carrier_bound_by(int ifindex, int **ifindexes);
+int sd_network_link_get_carrier_bound_by(int ifindex, const char *network_namespace, int **ifindexes);
 
 /* Get DHCPv6 client IAID for a given link. */
-int sd_network_link_get_dhcp6_client_iaid_string(int ifindex, char **iaid);
+int sd_network_link_get_dhcp6_client_iaid_string(int ifindex, const char *network_namespace, char **iaid);
 
 /* Get DHCPv6 client DUID for a given link. */
-int sd_network_link_get_dhcp6_client_duid_string(int ifindex, char **duid);
+int sd_network_link_get_dhcp6_client_duid_string(int ifindex, const char *network_namespace, char **duid);
 
 int sd_network_link_get_stat(int ifindex, struct stat *ret);
 
@@ -194,13 +194,13 @@ int sd_network_link_get_stat(int ifindex, struct stat *ret);
 typedef struct sd_network_monitor sd_network_monitor;
 
 /* Create a new monitor. Category must be NULL, "links" or "leases". */
-int sd_network_monitor_new(sd_network_monitor **ret, const char *category);
+int sd_network_monitor_new(sd_network_monitor **ret, const char *category, const char *network_namespace);
 
 /* Destroys the passed monitor. Returns NULL. */
 sd_network_monitor* sd_network_monitor_unref(sd_network_monitor *m);
 
 /* Flushes the monitor */
-int sd_network_monitor_flush(sd_network_monitor *m);
+int sd_network_monitor_flush(sd_network_monitor *m, const char *network_namespace);
 
 /* Get FD from monitor */
 int sd_network_monitor_get_fd(sd_network_monitor *m);

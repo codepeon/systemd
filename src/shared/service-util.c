@@ -79,9 +79,5 @@ int service_parse_argv(
                         assert_not_reached();
                 }
 
-        if (optind < argc)
-                return log_error_errno(SYNTHETIC_ERRNO(EINVAL),
-                                       "This program takes no arguments.");
-
         return 1; /* Further action */
 }

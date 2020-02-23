@@ -286,7 +286,7 @@ static int link_update_dns_servers(Link *l) {
 
         assert(l);
 
-        r = sd_network_link_get_dns(l->ifindex, &nameservers);
+        r = sd_network_link_get_dns(l->ifindex, NULL, &nameservers);
         if (r == -ENODATA) {
                 r = 0;
                 goto clear;
@@ -315,7 +315,7 @@ static int link_update_default_route(Link *l) {
 
         assert(l);
 
-        r = sd_network_link_get_dns_default_route(l->ifindex);
+        r = sd_network_link_get_dns_default_route(l->ifindex, NULL);
         if (r == -ENODATA) {
                 r = 0;
                 goto clear;
@@ -339,7 +339,7 @@ static int link_update_llmnr_support(Link *l) {
 
         l->llmnr_support = RESOLVE_SUPPORT_YES; /* yes, yes, we set it twice which is ugly */
 
-        r = sd_network_link_get_llmnr(l->ifindex, &b);
+        r = sd_network_link_get_llmnr(l->ifindex, NULL, &b);
         if (r == -ENODATA)
                 return 0;
         if (r < 0)
@@ -361,7 +361,7 @@ static int link_update_mdns_support(Link *l) {
 
         l->mdns_support = RESOLVE_SUPPORT_NO;
 
-        r = sd_network_link_get_mdns(l->ifindex, &b);
+        r = sd_network_link_get_mdns(l->ifindex, NULL, &b);
         if (r == -ENODATA)
                 return 0;
         if (r < 0)
@@ -396,7 +396,7 @@ static int link_update_dns_over_tls_mode(Link *l) {
 
         l->dns_over_tls_mode = _DNS_OVER_TLS_MODE_INVALID;
 
-        r = sd_network_link_get_dns_over_tls(l->ifindex, &b);
+        r = sd_network_link_get_dns_over_tls(l->ifindex, NULL, &b);
         if (r == -ENODATA)
                 return 0;
         if (r < 0)
@@ -445,7 +445,7 @@ static int link_update_dnssec_mode(Link *l) {
 
         l->dnssec_mode = _DNSSEC_MODE_INVALID;
 
-        r = sd_network_link_get_dnssec(l->ifindex, &m);
+        r = sd_network_link_get_dnssec(l->ifindex, NULL, &m);
         if (r == -ENODATA)
                 return 0;
         if (r < 0)
@@ -468,7 +468,7 @@ static int link_update_dnssec_negative_trust_anchors(Link *l) {
 
         l->dnssec_negative_trust_anchors = set_free_free(l->dnssec_negative_trust_anchors);
 
-        r = sd_network_link_get_dnssec_negative_trust_anchors(l->ifindex, &ntas);
+        r = sd_network_link_get_dnssec_negative_trust_anchors(l->ifindex, NULL, &ntas);
         if (r == -ENODATA)
                 return r;
         if (r < 0)
@@ -515,11 +515,11 @@ static int link_update_search_domains(Link *l) {
 
         assert(l);
 
-        r = sd_network_link_get_search_domains(l->ifindex, &sdomains);
+        r = sd_network_link_get_search_domains(l->ifindex, NULL, &sdomains);
         if (r < 0 && r != -ENODATA)
                 goto clear;
 
-        q = sd_network_link_get_route_domains(l->ifindex, &rdomains);
+        q = sd_network_link_get_route_domains(l->ifindex, NULL, &rdomains);
         if (q < 0 && q != -ENODATA) {
                 r = q;
                 goto clear;
@@ -559,7 +559,7 @@ static int link_is_managed(Link *l) {
 
         assert(l);
 
-        r = sd_network_link_get_setup_state(l->ifindex, &state);
+        r = sd_network_link_get_setup_state(l->ifindex, NULL, &state);
         if (r == -ENODATA)
                 return 0;
         if (r < 0)
@@ -681,7 +681,7 @@ bool link_relevant(Link *l, int family, bool local_multicast) {
         if (!IN_SET(l->operstate, IF_OPER_UNKNOWN, IF_OPER_UP))
                 return false;
 
-        (void) sd_network_link_get_operational_state(l->ifindex, &state);
+        (void) sd_network_link_get_operational_state(l->ifindex, NULL, &state);
         if (state && !STR_IN_SET(state, "unknown", "degraded", "degraded-carrier", "routable"))
                 return false;
 

@@ -845,10 +845,10 @@ static int list_links(int argc, char *argv[], void *userdata) {
                 const char *on_color_operational, *on_color_setup;
                 _cleanup_free_ char *t = NULL;
 
-                (void) sd_network_link_get_operational_state(links[i].ifindex, &operational_state);
+                (void) sd_network_link_get_operational_state(links[i].ifindex, NULL, &operational_state);
                 operational_state_to_color(links[i].name, operational_state, &on_color_operational, NULL);
 
-                r = sd_network_link_get_setup_state(links[i].ifindex, &setup_state);
+                r = sd_network_link_get_setup_state(links[i].ifindex, NULL, &setup_state);
                 if (r == -ENODATA) /* If there's no info available about this iface, it's unmanaged by networkd */
                         setup_state = strdup("unmanaged");
                 setup_state_to_color(setup_state, &on_color_setup, NULL);
@@ -1575,22 +1575,22 @@ static int link_status_one(
         assert(rtnl);
         assert(info);
 
-        (void) sd_network_link_get_operational_state(info->ifindex, &operational_state);
+        (void) sd_network_link_get_operational_state(info->ifindex, NULL, &operational_state);
         operational_state_to_color(info->name, operational_state, &on_color_operational, &off_color_operational);
 
-        (void) sd_network_link_get_online_state(info->ifindex, &online_state);
+        (void) sd_network_link_get_online_state(info->ifindex, NULL, &online_state);
         online_state_to_color(online_state, &on_color_online, NULL);
 
-        r = sd_network_link_get_setup_state(info->ifindex, &setup_state);
+        r = sd_network_link_get_setup_state(info->ifindex, NULL, &setup_state);
         if (r == -ENODATA) /* If there's no info available about this iface, it's unmanaged by networkd */
                 setup_state = strdup("unmanaged");
         setup_state_to_color(setup_state, &on_color_setup, &off_color_setup);
 
-        (void) sd_network_link_get_dns(info->ifindex, &dns);
-        (void) sd_network_link_get_search_domains(info->ifindex, &search_domains);
-        (void) sd_network_link_get_route_domains(info->ifindex, &route_domains);
-        (void) sd_network_link_get_ntp(info->ifindex, &ntp);
-        (void) sd_network_link_get_sip(info->ifindex, &sip);
+        (void) sd_network_link_get_dns(info->ifindex, NULL, &dns);
+        (void) sd_network_link_get_search_domains(info->ifindex, NULL, &search_domains);
+        (void) sd_network_link_get_route_domains(info->ifindex, NULL, &route_domains);
+        (void) sd_network_link_get_ntp(info->ifindex, NULL, &ntp);
+        (void) sd_network_link_get_sip(info->ifindex, NULL, &sip);
 
         if (info->sd_device) {
                 (void) sd_device_get_property_value(info->sd_device, "ID_NET_LINK_FILE", &link);
@@ -1608,10 +1608,10 @@ static int link_status_one(
         if (r == -ENOMEM)
                 return log_oom();
 
-        (void) sd_network_link_get_network_file(info->ifindex, &network);
+        (void) sd_network_link_get_network_file(info->ifindex, NULL, &network);
 
-        (void) sd_network_link_get_carrier_bound_to(info->ifindex, &carrier_bound_to);
-        (void) sd_network_link_get_carrier_bound_by(info->ifindex, &carrier_bound_by);
+        (void) sd_network_link_get_carrier_bound_to(info->ifindex, NULL, &carrier_bound_to);
+        (void) sd_network_link_get_carrier_bound_by(info->ifindex, NULL, &carrier_bound_by);
 
         if (asprintf(&lease_file, "/run/systemd/netif/leases/%d", info->ifindex) < 0)
                 return log_oom();
@@ -2220,7 +2220,7 @@ static int link_status_one(
         if (r < 0)
                 return r;
 
-        r = sd_network_link_get_activation_policy(info->ifindex, &activation_policy);
+        r = sd_network_link_get_activation_policy(info->ifindex, NULL, &activation_policy);
         if (r >= 0) {
                 r = table_add_many(table,
                                    TABLE_EMPTY,
@@ -2230,7 +2230,7 @@ static int link_status_one(
                         return table_log_add_error(r);
         }
 
-        r = sd_network_link_get_required_for_online(info->ifindex);
+        r = sd_network_link_get_required_for_online(info->ifindex, NULL);
         if (r >= 0) {
                 r = table_add_many(table,
                                    TABLE_EMPTY,
@@ -2271,7 +2271,7 @@ static int link_status_one(
                 }
         }
 
-        r = sd_network_link_get_dhcp6_client_iaid_string(info->ifindex, &iaid);
+        r = sd_network_link_get_dhcp6_client_iaid_string(info->ifindex, NULL, &iaid);
         if (r >= 0) {
                 r = table_add_many(table,
                                    TABLE_EMPTY,
@@ -2281,7 +2281,7 @@ static int link_status_one(
                         return table_log_add_error(r);
         }
 
-        r = sd_network_link_get_dhcp6_client_duid_string(info->ifindex, &duid);
+        r = sd_network_link_get_dhcp6_client_duid_string(info->ifindex, NULL, &duid);
         if (r >= 0) {
                 r = table_add_many(table,
                                    TABLE_EMPTY,
@@ -2320,10 +2320,10 @@ static int system_status(sd_netlink *rtnl, sd_hwdb *hwdb) {
 
         assert(rtnl);
 
-        (void) sd_network_get_operational_state(&operational_state);
+        (void) sd_network_get_operational_state(NULL, &operational_state);
         operational_state_to_color(NULL, operational_state, &on_color_operational, NULL);
 
-        (void) sd_network_get_online_state(&online_state);
+        (void) sd_network_get_online_state(NULL, &online_state);
         online_state_to_color(online_state, &on_color_online, NULL);
 
         table = table_new("dot", "key", "value");
@@ -2362,22 +2362,22 @@ static int system_status(sd_netlink *rtnl, sd_hwdb *hwdb) {
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_dns(&dns);
+        (void) sd_network_get_dns(NULL, &dns);
         r = dump_list(table, "DNS:", dns);
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_search_domains(&search_domains);
+        (void) sd_network_get_search_domains(NULL, &search_domains);
         r = dump_list(table, "Search Domains:", search_domains);
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_route_domains(&route_domains);
+        (void) sd_network_get_route_domains(NULL, &route_domains);
         r = dump_list(table, "Route Domains:", route_domains);
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_ntp(&ntp);
+        (void) sd_network_get_ntp(NULL, &ntp);
         r = dump_list(table, "NTP:", ntp);
         if (r < 0)
                 return r;

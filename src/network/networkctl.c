@@ -28,6 +28,7 @@
 #include "bus-common-errors.h"
 #include "bus-error.h"
 #include "bus-locator.h"
+#include "device-internal.h"
 #include "device-util.h"
 #include "dirent-util.h"
 #include "escape.h"
@@ -85,6 +86,9 @@ static bool arg_stats = false;
 static bool arg_full = false;
 static unsigned arg_lines = 10;
 static JsonFormatFlags arg_json_format_flags = JSON_FORMAT_OFF;
+static const char *arg_namespace = NULL;
+
+static int set_netns(void);
 
 static int get_description(JsonVariant **ret) {
         _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
@@ -762,6 +766,9 @@ static int acquire_link_info(sd_bus *bus, sd_netlink *rtnl, char **patterns, Lin
 
                 (void) sd_device_new_from_ifindex(&links[c].sd_device, links[c].ifindex);
 
+                if (arg_namespace)
+                        device_prohibit_to_touch_db(links[c].sd_device);
+
                 acquire_ether_link_info(&fd, &links[c]);
                 acquire_wlan_link_info(&links[c]);
 
@@ -810,6 +817,10 @@ static int list_links(int argc, char *argv[], void *userdata) {
                         return dump_link_description(strv_skip(argv, 1));
         }
 
+        r = set_netns();
+        if (r < 0)
+                return r;
+
         r = sd_netlink_open(&rtnl);
         if (r < 0)
                 return log_error_errno(r, "Failed to connect to netlink: %m");
@@ -845,10 +856,10 @@ static int list_links(int argc, char *argv[], void *userdata) {
                 const char *on_color_operational, *on_color_setup;
                 _cleanup_free_ char *t = NULL;
 
-                (void) sd_network_link_get_operational_state(links[i].ifindex, NULL, &operational_state);
+                (void) sd_network_link_get_operational_state(links[i].ifindex, arg_namespace, &operational_state);
                 operational_state_to_color(links[i].name, operational_state, &on_color_operational, NULL);
 
-                r = sd_network_link_get_setup_state(links[i].ifindex, NULL, &setup_state);
+                r = sd_network_link_get_setup_state(links[i].ifindex, arg_namespace, &setup_state);
                 if (r == -ENODATA) /* If there's no info available about this iface, it's unmanaged by networkd */
                         setup_state = strdup("unmanaged");
                 setup_state_to_color(setup_state, &on_color_setup, NULL);
@@ -1220,6 +1231,10 @@ static int list_address_labels(int argc, char *argv[], void *userdata) {
         _cleanup_(sd_netlink_unrefp) sd_netlink *rtnl = NULL;
         int r;
 
+        r = set_netns();
+        if (r < 0)
+                return r;
+
         r = sd_netlink_open(&rtnl);
         if (r < 0)
                 return log_error_errno(r, "Failed to connect to netlink: %m");
@@ -1575,22 +1590,22 @@ static int link_status_one(
         assert(rtnl);
         assert(info);
 
-        (void) sd_network_link_get_operational_state(info->ifindex, NULL, &operational_state);
+        (void) sd_network_link_get_operational_state(info->ifindex, arg_namespace, &operational_state);
         operational_state_to_color(info->name, operational_state, &on_color_operational, &off_color_operational);
 
-        (void) sd_network_link_get_online_state(info->ifindex, NULL, &online_state);
+        (void) sd_network_link_get_online_state(info->ifindex, arg_namespace, &online_state);
         online_state_to_color(online_state, &on_color_online, NULL);
 
-        r = sd_network_link_get_setup_state(info->ifindex, NULL, &setup_state);
+        r = sd_network_link_get_setup_state(info->ifindex, arg_namespace, &setup_state);
         if (r == -ENODATA) /* If there's no info available about this iface, it's unmanaged by networkd */
                 setup_state = strdup("unmanaged");
         setup_state_to_color(setup_state, &on_color_setup, &off_color_setup);
 
-        (void) sd_network_link_get_dns(info->ifindex, NULL, &dns);
-        (void) sd_network_link_get_search_domains(info->ifindex, NULL, &search_domains);
-        (void) sd_network_link_get_route_domains(info->ifindex, NULL, &route_domains);
-        (void) sd_network_link_get_ntp(info->ifindex, NULL, &ntp);
-        (void) sd_network_link_get_sip(info->ifindex, NULL, &sip);
+        (void) sd_network_link_get_dns(info->ifindex, arg_namespace, &dns);
+        (void) sd_network_link_get_search_domains(info->ifindex, arg_namespace, &search_domains);
+        (void) sd_network_link_get_route_domains(info->ifindex, arg_namespace, &route_domains);
+        (void) sd_network_link_get_ntp(info->ifindex, arg_namespace, &ntp);
+        (void) sd_network_link_get_sip(info->ifindex, arg_namespace, &sip);
 
         if (info->sd_device) {
                 (void) sd_device_get_property_value(info->sd_device, "ID_NET_LINK_FILE", &link);
@@ -1608,12 +1623,16 @@ static int link_status_one(
         if (r == -ENOMEM)
                 return log_oom();
 
-        (void) sd_network_link_get_network_file(info->ifindex, NULL, &network);
+        (void) sd_network_link_get_network_file(info->ifindex, arg_namespace, &network);
 
-        (void) sd_network_link_get_carrier_bound_to(info->ifindex, NULL, &carrier_bound_to);
-        (void) sd_network_link_get_carrier_bound_by(info->ifindex, NULL, &carrier_bound_by);
+        (void) sd_network_link_get_carrier_bound_to(info->ifindex, arg_namespace, &carrier_bound_to);
+        (void) sd_network_link_get_carrier_bound_by(info->ifindex, arg_namespace, &carrier_bound_by);
 
-        if (asprintf(&lease_file, "/run/systemd/netif/leases/%d", info->ifindex) < 0)
+        if (arg_namespace)
+            r = asprintf(&lease_file, "/run/systemd/netif.%s/leases/%d", arg_namespace, info->ifindex);
+        else
+            r = asprintf(&lease_file, "/run/systemd/netif/leases/%d", info->ifindex);
+        if (r < 0)
                 return log_oom();
 
         (void) dhcp_lease_load(&lease, lease_file);
@@ -2320,10 +2339,10 @@ static int system_status(sd_netlink *rtnl, sd_hwdb *hwdb) {
 
         assert(rtnl);
 
-        (void) sd_network_get_operational_state(NULL, &operational_state);
+        (void) sd_network_get_operational_state(arg_namespace, &operational_state);
         operational_state_to_color(NULL, operational_state, &on_color_operational, NULL);
 
-        (void) sd_network_get_online_state(NULL, &online_state);
+        (void) sd_network_get_online_state(arg_namespace, &online_state);
         online_state_to_color(online_state, &on_color_online, NULL);
 
         table = table_new("dot", "key", "value");
@@ -2362,22 +2381,22 @@ static int system_status(sd_netlink *rtnl, sd_hwdb *hwdb) {
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_dns(NULL, &dns);
+        (void) sd_network_get_dns(arg_namespace, &dns);
         r = dump_list(table, "DNS:", dns);
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_search_domains(NULL, &search_domains);
+        (void) sd_network_get_search_domains(arg_namespace, &search_domains);
         r = dump_list(table, "Search Domains:", search_domains);
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_route_domains(NULL, &route_domains);
+        (void) sd_network_get_route_domains(arg_namespace, &route_domains);
         r = dump_list(table, "Route Domains:", route_domains);
         if (r < 0)
                 return r;
 
-        (void) sd_network_get_ntp(NULL, &ntp);
+        (void) sd_network_get_ntp(arg_namespace, &ntp);
         r = dump_list(table, "NTP:", ntp);
         if (r < 0)
                 return r;
@@ -2403,11 +2422,17 @@ static int link_status(int argc, char *argv[], void *userdata) {
                         return dump_link_description(strv_skip(argv, 1));
         }
 
+        r = set_netns();
+        if (r < 0)
+                return r;
+
         pager_open(arg_pager_flags);
 
-        r = sd_bus_open_system(&bus);
-        if (r < 0)
-                return log_error_errno(r, "Failed to connect system bus: %m");
+        if (!arg_namespace) {
+                r = sd_bus_open_system(&bus);
+                if (r < 0)
+                        return log_error_errno(r, "Failed to connect system bus: %m");
+        }
 
         r = sd_netlink_open(&rtnl);
         if (r < 0)
@@ -2493,6 +2518,10 @@ static int link_lldp_status(int argc, char *argv[], void *userdata) {
         int r, c, m = 0;
         uint16_t all = 0;
         TableCell *cell;
+
+        r = set_netns();
+        if (r < 0)
+                return r;
 
         r = sd_netlink_open(&rtnl);
         if (r < 0)
@@ -2703,6 +2732,10 @@ static int link_delete(int argc, char *argv[], void *userdata) {
         int index, r;
         void *p;
 
+        r = set_netns();
+        if (r < 0)
+                return r;
+
         r = sd_netlink_open(&rtnl);
         if (r < 0)
                 return log_error_errno(r, "Failed to connect to netlink: %m");
@@ -2749,6 +2782,10 @@ static int link_renew(int argc, char *argv[], void *userdata) {
         _cleanup_(sd_netlink_unrefp) sd_netlink *rtnl = NULL;
         int index, k = 0, r;
 
+        if (arg_namespace)
+                return log_error_errno(SYNTHETIC_ERRNO(EOPNOTSUPP),
+                                       "-N/--namespace option is not supported.");
+
         r = sd_bus_open_system(&bus);
         if (r < 0)
                 return log_error_errno(r, "Failed to connect system bus: %m");
@@ -2783,6 +2820,10 @@ static int link_force_renew(int argc, char *argv[], void *userdata) {
         _cleanup_(sd_netlink_unrefp) sd_netlink *rtnl = NULL;
         int k = 0, r;
 
+        if (arg_namespace)
+                return log_error_errno(SYNTHETIC_ERRNO(EOPNOTSUPP),
+                                       "-N/--namespace option is not supported.");
+
         r = sd_bus_open_system(&bus);
         if (r < 0)
                 return log_error_errno(r, "Failed to connect system bus: %m");
@@ -2805,6 +2846,10 @@ static int verb_reload(int argc, char *argv[], void *userdata) {
         _cleanup_(sd_bus_flush_close_unrefp) sd_bus *bus = NULL;
         int r;
 
+        if (arg_namespace)
+                return log_error_errno(SYNTHETIC_ERRNO(EOPNOTSUPP),
+                                       "-N/--namespace option is not supported.");
+
         r = sd_bus_open_system(&bus);
         if (r < 0)
                 return log_error_errno(r, "Failed to connect system bus: %m");
@@ -2823,6 +2868,10 @@ static int verb_reconfigure(int argc, char *argv[], void *userdata) {
         _cleanup_set_free_ Set *indexes = NULL;
         int index, r;
         void *p;
+
+        if (arg_namespace)
+                return log_error_errno(SYNTHETIC_ERRNO(EOPNOTSUPP),
+                                       "-N/--namespace option is not supported.");
 
         r = sd_bus_open_system(&bus);
         if (r < 0)
@@ -2849,6 +2898,43 @@ static int verb_reconfigure(int argc, char *argv[], void *userdata) {
                         return log_error_errno(r, "Failed to reconfigure network interface %s: %m",
                                                FORMAT_IFNAME_FULL(index, FORMAT_IFNAME_IFINDEX));
         }
+
+        return 0;
+}
+
+static int set_netns(void) {
+        _cleanup_free_ char *path = NULL;
+        _cleanup_close_ int fd = -1;
+        int r;
+
+        if (!arg_namespace)
+                return 0;
+
+        path = path_make_absolute(arg_namespace, "/var/run/netns");
+        if (!path)
+                return log_oom();
+
+        fd = open(path, O_RDONLY | O_CLOEXEC);
+        if (fd < 0)
+                return log_error_errno(errno, "Failed to open %s: %m", path);
+
+        r = setns(fd, CLONE_NEWNET);
+        if (r < 0)
+                return log_error_errno(errno, "Failed to set network namespace: %m");
+
+        r = unshare(CLONE_NEWNS);
+        if (r < 0)
+                return log_error_errno(errno, "Failed to unshare(): %m");
+
+        r = mount(NULL, "/", NULL, MS_SLAVE | MS_REC, NULL);
+        if (r < 0)
+                return log_error_errno(errno, "Failed to remount '/' as SLAVE: %m");
+
+        (void) umount2("/sys", MNT_DETACH);
+
+        r = mount("sysfs", "/sys", "sysfs", 0, NULL);
+        if (r < 0)
+                return log_error_errno(errno, "Failed to mount /sys: %m");
 
         return 0;
 }
@@ -3029,6 +3115,7 @@ static int help(void) {
                "  -n --lines=INTEGER     Number of journal entries to show\n"
                "     --json=pretty|short|off\n"
                "                         Generate JSON output\n"
+               "  -N --namespace         Network namespace\n"
                "\nSee the %s for details.\n",
                program_invocation_short_name,
                ansi_highlight(),
@@ -3057,6 +3144,7 @@ static int parse_argv(int argc, char *argv[]) {
                 { "full",      no_argument,       NULL, 'l'           },
                 { "lines",     required_argument, NULL, 'n'           },
                 { "json",      required_argument, NULL, ARG_JSON      },
+                { "namespace", required_argument, NULL, 'N'           },
                 {}
         };
 
@@ -3065,7 +3153,7 @@ static int parse_argv(int argc, char *argv[]) {
         assert(argc >= 0);
         assert(argv);
 
-        while ((c = getopt_long(argc, argv, "hasln:", options, NULL)) >= 0) {
+        while ((c = getopt_long(argc, argv, "hasln:N:", options, NULL)) >= 0) {
 
                 switch (c) {
 
@@ -3105,6 +3193,10 @@ static int parse_argv(int argc, char *argv[]) {
                         r = parse_json_argument(optarg, &arg_json_format_flags);
                         if (r <= 0)
                                 return r;
+                        break;
+
+                case 'N':
+                        arg_namespace = optarg;
                         break;
 
                 case '?':

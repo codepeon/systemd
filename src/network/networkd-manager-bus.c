@@ -195,7 +195,6 @@ static int bus_method_reconfigure_link(sd_bus_message *message, void *userdata, 
 
 static int bus_method_reload(sd_bus_message *message, void *userdata, sd_bus_error *error) {
         Manager *manager = userdata;
-        Link *link;
         int r;
 
         r = bus_verify_polkit_async(message, CAP_NET_ADMIN,
@@ -207,19 +206,9 @@ static int bus_method_reload(sd_bus_message *message, void *userdata, sd_bus_err
         if (r == 0)
                 return 1; /* Polkit will call us back */
 
-        r = netdev_load(manager, true);
+        r = manager_reload(manager);
         if (r < 0)
                 return r;
-
-        r = network_reload(manager);
-        if (r < 0)
-                return r;
-
-        HASHMAP_FOREACH(link, manager->links_by_index) {
-                r = link_reconfigure(link, /* force = */ false);
-                if (r < 0)
-                        return r;
-        }
 
         return sd_bus_reply_method_return(message, NULL);
 }

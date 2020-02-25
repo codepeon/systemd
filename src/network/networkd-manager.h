@@ -11,6 +11,8 @@
 #include "dhcp-identifier.h"
 #include "firewall-util.h"
 #include "hashmap.h"
+#include "varlink.h"
+
 #include "networkd-link.h"
 #include "networkd-network.h"
 #include "ordered-set.h"
@@ -30,6 +32,8 @@ struct Manager {
         sd_device_monitor *device_monitor;
         Hashmap *polkit_registry;
         int ethtool_fd;
+
+        VarlinkServer *varlink_server;
 
         bool enumerating;
         bool dirty;
@@ -104,13 +108,14 @@ struct Manager {
         OrderedSet *request_queue;
 };
 
-int manager_new(Manager **ret, const char *namespace);
+int manager_new(Manager **ret, const char *namespace, bool open_varlink);
 Manager* manager_free(Manager *m);
 
 int manager_connect_bus(Manager *m);
 int manager_start(Manager *m);
 
 int manager_load_config(Manager *m);
+int manager_reload(Manager *m);
 bool manager_should_reload(Manager *m);
 
 int manager_enumerate(Manager *m);

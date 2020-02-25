@@ -12,13 +12,14 @@ Description=Wait for Network Interface %i to be Configured
 Documentation=man:systemd-networkd-wait-online.service(8)
 DefaultDependencies=no
 Conflicts=shutdown.target
-Requires=systemd-networkd.service
-After=systemd-networkd.service
+Requires=systemd-networkd@%i.service
+After=systemd-networkd@%i.service
 Before=network-online.target shutdown.target
 
 [Service]
 Type=oneshot
-ExecStart={{ROOTLIBEXECDIR}}/systemd-networkd-wait-online -i %i
+ExecStart={{ROOTLIBEXECDIR}}/systemd-networkd-wait-online --namespace %i
+NetworkNamespacePath=/run/netns/%i
 RemainAfterExit=yes
 
 [Install]

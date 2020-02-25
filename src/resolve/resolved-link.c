@@ -616,7 +616,7 @@ static void link_read_settings(Link *l) {
 
         l->is_managed = true;
 
-        r = network_link_get_operational_state(l->ifindex, NULL, &l->networkd_operstate);
+        r = network_link_get_operational_state(l->ifindex, l->manager->namespace, &l->networkd_operstate);
         if (r < 0)
                 log_link_warning_errno(l, r, "Failed to read networkd's link operational state, ignoring: %m");
 

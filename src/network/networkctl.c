@@ -2248,7 +2248,7 @@ static int link_status_one(
                         return table_log_add_error(r);
         }
 
-        r = sd_network_link_get_required_for_online(info->ifindex, NULL);
+        r = sd_network_link_get_required_for_online(info->ifindex, arg_namespace);
         if (r >= 0) {
                 r = table_add_many(table,
                                    TABLE_EMPTY,

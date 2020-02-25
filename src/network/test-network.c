@@ -291,7 +291,7 @@ int main(void) {
         test_dhcp_hostname_shorten_overlong();
 
         assert_se(manager_new(&manager, NULL, /* test_mode = */ true) >= 0);
-        assert_se(manager_setup(manager) >= 0);
+        assert_se(manager_setup(manager, false) >= 0);
 
         test_route_tables(manager);
 

@@ -131,6 +131,7 @@ units = [
         ['systemd-journald-varlink@.socket',    ''],
         ['systemd-networkd.socket',             'ENABLE_NETWORKD'],
         ['systemd-networkd@.socket',            'ENABLE_NETWORKD'],
+        ['systemd-networkd-varlink@.socket',    'ENABLE_NETWORKD'],
         ['systemd-poweroff.service',            ''],
         ['systemd-reboot.service',              ''],
         ['systemd-rfkill.socket',               'ENABLE_RFKILL'],

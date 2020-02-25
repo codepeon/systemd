@@ -41,6 +41,7 @@
 #include "networkd-routing-policy-rule.h"
 #include "networkd-speed-meter.h"
 #include "networkd-state-file.h"
+#include "networkd-varlink.h"
 #include "networkd-wifi.h"
 #include "ordered-set.h"
 #include "path-lookup.h"
@@ -198,24 +199,6 @@ static int manager_connect_udev(Manager *m) {
         return 0;
 }
 
-static int systemd_netlink_fd(void) {
-        int n, fd, rtnl_fd = -EINVAL;
-
-        n = sd_listen_fds(true);
-        if (n <= 0)
-                return -EINVAL;
-
-        for (fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + n; fd ++)
-                if (sd_is_socket(fd, AF_NETLINK, SOCK_RAW, -1) > 0) {
-                        if (rtnl_fd >= 0)
-                                return -EINVAL;
-
-                        rtnl_fd = fd;
-                }
-
-        return rtnl_fd;
-}
-
 static int manager_connect_genl(Manager *m) {
         int r;
 
@@ -280,12 +263,11 @@ static int manager_setup_rtnl_filter(Manager *manager) {
         return sd_netlink_attach_filter(manager->rtnl, ELEMENTSOF(filter), filter);
 }
 
-static int manager_connect_rtnl(Manager *m) {
-        int fd, r;
+static int manager_connect_rtnl(Manager *m, int fd) {
+        int r;
 
         assert(m);
 
-        fd = systemd_netlink_fd();
         if (fd < 0)
                 r = sd_netlink_open(&m->rtnl);
         else
@@ -401,8 +383,9 @@ static int signal_restart_callback(sd_event_source *s, const struct signalfd_sig
         return sd_event_exit(sd_event_source_get_event(s), 0);
 }
 
-int manager_setup(Manager *m) {
-        int r;
+int manager_setup(Manager *m, bool open_varlink) {
+        const char *varlink_socket;
+        int r, n, fd, rtnl_fd = -1, varlink_fd = -1;
 
         assert(m);
 
@@ -425,7 +408,27 @@ int manager_setup(Manager *m) {
         if (r < 0)
                 return r;
 
-        r = manager_connect_rtnl(m);
+        varlink_socket = strjoina(m->runtime_directory, "/io.systemd.network");
+
+        n = sd_listen_fds(true);
+        if (n < 0)
+                return n;
+
+        for (fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + n; fd ++) {
+                if (sd_is_socket(fd, AF_NETLINK, SOCK_RAW, -1) > 0) {
+                        if (rtnl_fd >= 0)
+                                return -EINVAL;
+
+                        rtnl_fd = fd;
+                } else if (sd_is_socket_unix(fd, SOCK_STREAM, 1, varlink_socket, 0) > 0) {
+                        if (varlink_fd >= 0)
+                                return -EINVAL;
+
+                        varlink_fd = fd;
+                }
+        }
+
+        r = manager_connect_rtnl(m, rtnl_fd);
         if (r < 0)
                 return r;
 
@@ -439,6 +442,12 @@ int manager_setup(Manager *m) {
         r = manager_connect_bus(m);
         if (r < 0)
                 return r;
+
+        if (open_varlink) {
+                r = manager_open_varlink(m, varlink_socket, varlink_fd);
+                if (r < 0)
+                        return r;
+        }
 
         r = manager_connect_udev(m);
         if (r < 0)
@@ -508,6 +517,8 @@ Manager* manager_free(Manager *m) {
 
         if (!m)
                 return NULL;
+
+        varlink_server_unref(m->varlink_server);
 
         free(m->namespace);
         free(m->runtime_directory);
@@ -609,6 +620,29 @@ int manager_load_config(Manager *m) {
                 return r;
 
         return manager_build_dhcp_pd_subnet_ids(m);
+}
+
+int manager_reload(Manager *m) {
+        Link *link;
+        int r;
+
+        assert(m);
+
+        r = netdev_load(m, true);
+        if (r < 0)
+                return r;
+
+        r = network_reload(m);
+        if (r < 0)
+                return r;
+
+        HASHMAP_FOREACH(link, m->links_by_index) {
+                r = link_reconfigure(link, false);
+                if (r < 0)
+                        return r;
+        }
+
+        return 0;
 }
 
 bool manager_should_reload(Manager *m) {

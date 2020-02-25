@@ -63,8 +63,6 @@ struct Manager {
         OrderedSet *address_pools;
         Set *dhcp_pd_subnet_ids;
 
-        usec_t network_dirs_ts_usec;
-
         DUID dhcp_duid;
         DUID dhcp6_duid;
         DUID duid_product_uuid;
@@ -118,7 +116,6 @@ int manager_start(Manager *m);
 
 int manager_load_config(Manager *m);
 int manager_reload(Manager *m);
-bool manager_should_reload(Manager *m);
 
 int manager_enumerate(Manager *m);
 

@@ -659,9 +659,6 @@ int manager_start(Manager *m) {
 int manager_load_config(Manager *m) {
         int r;
 
-        /* update timestamp */
-        paths_check_timestamp(NETWORK_DIRS, &m->network_dirs_ts_usec, true);
-
         r = netdev_load(m, false);
         if (r < 0)
                 return r;
@@ -694,10 +691,6 @@ int manager_reload(Manager *m) {
         }
 
         return 0;
-}
-
-bool manager_should_reload(Manager *m) {
-        return paths_check_timestamp(NETWORK_DIRS, &m->network_dirs_ts_usec, false);
 }
 
 static int manager_enumerate_internal(

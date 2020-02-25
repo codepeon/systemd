@@ -223,6 +223,7 @@ in_units = [
         ['systemd-networkd.service',             'ENABLE_NETWORKD'],
         ['systemd-networkd@.service',            'ENABLE_NETWORKD'],
         ['systemd-networkd-wait-online.service', 'ENABLE_NETWORKD'],
+        ['systemd-networkd-wait-online@.service', 'ENABLE_NETWORKD'],
         ['systemd-nspawn@.service',              ''],
         ['systemd-oomd.service',                 'ENABLE_OOMD',
          'dbus-org.freedesktop.oom1.service'],

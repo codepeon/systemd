@@ -14,6 +14,8 @@ typedef struct Link Link;
 
 struct Manager {
         Hashmap *links_by_index;
+        char *namespace;
+
         Hashmap *links_by_name;
 
         /* Do not free the two members below. */
@@ -37,7 +39,7 @@ Manager* manager_free(Manager *m);
 int manager_new(Manager **ret, Hashmap *command_line_interfaces_by_name, char **ignored_interfaces,
                 LinkOperationalStateRange required_operstate,
                 AddressFamily required_family,
-                bool any, usec_t timeout);
+                bool any, usec_t timeout, const char *namespace);
 
 DEFINE_TRIVIAL_CLEANUP_FUNC(Manager*, manager_free);
 

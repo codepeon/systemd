@@ -2761,6 +2761,52 @@ int setup_shareable_ns(const int ns_storage_socket[static 2], unsigned long nsfl
         return r;
 }
 
+static int netns_create(const char *path) {
+        _cleanup_close_ int old_netns = -1, netns = -1;
+        int r;
+
+        r = mkdir_parents(path, 0755);
+        if (r < 0)
+                return r;
+
+        r = touch(path);
+        if (r < 0)
+                return r;
+
+        /* Save the current netns. */
+        old_netns = open("/proc/self/ns/net", O_RDONLY | O_CLOEXEC);
+        if (old_netns < 0)
+                return -errno;
+
+        /* Create a new netns */
+        if (unshare(CLONE_NEWNET) < 0)
+                return -errno;
+
+        (void) loopback_setup();
+
+        /* Mount the new netns onto the path. */
+        if (mount("/proc/self/ns/net", path, "none", MS_BIND, NULL) < 0) {
+                r = -errno;
+                (void) setns(old_netns, CLONE_NEWNET);
+                return r;
+        }
+
+        /* Open the new netns. */
+        netns = open("/proc/self/ns/net", O_RDONLY | O_CLOEXEC);
+        if (netns < 0) {
+                r = -errno;
+                (void) umount(path);
+                (void) setns(old_netns, CLONE_NEWNET);
+                return r;
+        }
+
+        /* Restore the original netns. */
+        if (setns(old_netns, CLONE_NEWNET) < 0)
+                return -errno;
+
+        return TAKE_FD(netns);
+}
+
 int open_shareable_ns_path(const int ns_storage_socket[static 2], const char *path, unsigned long nsflag) {
         _cleanup_(unlockfp) int storage_socket0_lock = -1;
         _cleanup_close_ int ns = -1;
@@ -2784,14 +2830,21 @@ int open_shareable_ns_path(const int ns_storage_socket[static 2], const char *pa
                 /* Nothing stored yet. Open the file from the file system. */
 
                 ns = open(path, O_RDONLY|O_NOCTTY|O_CLOEXEC);
-                if (ns < 0)
-                        return -errno;
+                if (ns < 0) {
+                        if (errno != ENOENT)
+                                return -errno;
 
-                r = fd_is_ns(ns, nsflag);
-                if (r == 0) /* Not a netns? Refuse early. */
-                        return -EINVAL;
-                if (r < 0 && r != -EUCLEAN) /* EUCLEAN: we don't know */
-                        return r;
+                        /* Not exists yet. Let's create a new namespace. */
+                        ns = netns_create(path);
+                        if (ns < 0)
+                                return ns;
+                } else {
+                        r = fd_is_ns(ns, nsflag);
+                        if (r == 0) /* Not a netns? Refuse early. */
+                                return -EINVAL;
+                        if (r < 0 && r != -EUCLEAN) /* EUCLEAN: we don't know */
+                                return r;
+                }
 
                 r = 1;
 

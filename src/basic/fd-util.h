@@ -110,6 +110,9 @@ int fd_reopen(int fd, int flags);
 int read_nr_open(void);
 int btrfs_defrag_fd(int fd);
 
+int lockfp(int fd, int *fd_lock);
+void unlockfp(int *fd_lock);
+
 /* The maximum length a buffer for a /proc/self/fd/<fd> path needs */
 #define PROC_FD_PATH_MAX \
         (STRLEN("/proc/self/fd/") + DECIMAL_STR_MAX(int))

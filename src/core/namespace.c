@@ -2829,6 +2829,7 @@ int setup_tmp_dirs(const char *id, char **tmp_dir, char **var_tmp_dir) {
 
 int setup_shareable_ns(const int ns_storage_socket[static 2], unsigned long nsflag) {
         _cleanup_close_ int ns = -1;
+        _cleanup_(unlockfp) int storage_socket0_lock = -1;
         int r, q;
         const char *ns_name, *ns_path;
 
@@ -2847,55 +2848,45 @@ int setup_shareable_ns(const int ns_storage_socket[static 2], unsigned long nsfl
          *
          * It's a bit crazy, but hey, works great! */
 
-        if (lockf(ns_storage_socket[0], F_LOCK, 0) < 0)
-                return -errno;
+        r = lockfp(ns_storage_socket[0], &storage_socket0_lock);
+        if (r < 0)
+                return r;
 
         ns = receive_one_fd(ns_storage_socket[0], MSG_DONTWAIT);
         if (ns == -EAGAIN) {
                 /* Nothing stored yet, so let's create a new namespace. */
 
-                if (unshare(nsflag) < 0) {
-                        r = -errno;
-                        goto fail;
-                }
+                if (unshare(nsflag) < 0)
+                        return -errno;
 
                 (void) loopback_setup();
 
                 ns_path = strjoina("/proc/self/ns/", ns_name);
                 ns = open(ns_path, O_RDONLY|O_CLOEXEC|O_NOCTTY);
-                if (ns < 0) {
-                        r = -errno;
-                        goto fail;
-                }
+                if (ns < 0)
+                        return -errno;
 
                 r = 1;
 
-        } else if (ns < 0) {
-                r = ns;
-                goto fail;
-
-        } else {
+        } else if (ns < 0)
+            return ns;
+        else {
                 /* Yay, found something, so let's join the namespace */
-                if (setns(ns, nsflag) < 0) {
-                        r = -errno;
-                        goto fail;
-                }
+                if (setns(ns, nsflag) < 0)
+                        return -errno;
 
                 r = 0;
         }
 
         q = send_one_fd(ns_storage_socket[1], ns, MSG_DONTWAIT);
-        if (q < 0) {
-                r = q;
-                goto fail;
-        }
+        if (q < 0)
+                return q;
 
-fail:
-        (void) lockf(ns_storage_socket[0], F_ULOCK, 0);
         return r;
 }
 
 int open_shareable_ns_path(const int ns_storage_socket[static 2], const char *path, unsigned long nsflag) {
+        _cleanup_(unlockfp) int storage_socket0_lock = -1;
         _cleanup_close_ int ns = -1;
         int q, r;
 
@@ -2908,43 +2899,35 @@ int open_shareable_ns_path(const int ns_storage_socket[static 2], const char *pa
          * it. This is supposed to be called ahead of time, i.e. before setup_shareable_ns() which will
          * allocate a new anonymous ns if needed. */
 
-        if (lockf(ns_storage_socket[0], F_LOCK, 0) < 0)
-                return -errno;
+        r = lockfp(ns_storage_socket[0], &storage_socket0_lock);
+        if (r < 0)
+                return r;
 
         ns = receive_one_fd(ns_storage_socket[0], MSG_DONTWAIT);
         if (ns == -EAGAIN) {
                 /* Nothing stored yet. Open the file from the file system. */
 
                 ns = open(path, O_RDONLY|O_NOCTTY|O_CLOEXEC);
-                if (ns < 0) {
-                        r = -errno;
-                        goto fail;
-                }
+                if (ns < 0)
+                        return -errno;
 
                 r = fd_is_ns(ns, nsflag);
-                if (r == 0) { /* Not a ns of our type? Refuse early. */
-                        r = -EINVAL;
-                        goto fail;
-                }
+                if (r == 0) /* Not a netns? Refuse early. */
+                        return -EINVAL;
                 if (r < 0 && r != -EUCLEAN) /* EUCLEAN: we don't know */
-                        goto fail;
+                        return r;
 
                 r = 1;
 
-        } else if (ns < 0) {
-                r = ns;
-                goto fail;
-        } else
+        } else if (ns < 0)
+                return ns;
+        else
                 r = 0; /* Already allocated */
 
         q = send_one_fd(ns_storage_socket[1], ns, MSG_DONTWAIT);
-        if (q < 0) {
-                r = q;
-                goto fail;
-        }
+        if (q < 0)
+                return q;
 
-fail:
-        (void) lockf(ns_storage_socket[0], F_ULOCK, 0);
         return r;
 }
 
